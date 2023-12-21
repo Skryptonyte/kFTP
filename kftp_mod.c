@@ -8,6 +8,7 @@
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/socket.h>
+#include <net/sock.h>
 
 #include "ftp_serv.h"
 #include "ftp_utils.h"
@@ -16,41 +17,86 @@ MODULE_LICENSE("GPL");
 static char *startmsg = "220 kFTP - the kernel level FTP server nobody asked for!\r\n";
 static struct socket *ftpsock;
 
-void processFTP(struct socket* clientsock,char* buf)
+
+int processFTP(struct client_context* ctx,struct socket* clientsock,char* buf)
 {
 
     printk(KERN_INFO "kftp: recieved FTP command: %s",buf);
     
     if (!strncmp(buf,"USER",4))
     {
-        ftpUSER(clientsock);
+        ftpUSER(ctx, clientsock);
     }
     else if (!strncmp(buf,"PASS",4))
     {
-        ftpPASS(clientsock);
+        ftpPASS(ctx, clientsock);
+    }
+    else if (!strncmp(buf,"SYST",4))
+    {
+        ftpSYST(ctx, clientsock);
+    }
+    else if (!strncmp(buf,"PASV",4))
+    {
+        ftpPASV(ctx, clientsock);
+    }
+    else if (!strncmp(buf,"QUIT",4))
+    {
+        ftpQUIT(ctx, clientsock);
+    }
+    else if (!strncmp(buf,"TYPE",4))
+    {
+        ftpTYPE(ctx, clientsock);
+    }
+    else if (!strncmp(buf,"RETR",4))
+    {
+        ftpRETR(ctx, clientsock);
     }
     else
     {
-        char* response = "500 unrecognized command!\r\n";
+        printk(KERN_INFO "kftp: Unrecognized Command");
+        char* response = "500 UNRECOGNIZED COMMAND\r\n";
         kernel_send(clientsock,response,strlen(response));
     }
+    return 0;
 }
 
 int recieve_loop(struct socket* clientsock)
 {
+    printk(KERN_INFO "Allocating client socket object.");
+    struct client_context *ctx = kmalloc(sizeof(struct client_context),GFP_KERNEL);
+    ctx->passive = 0;
+    ctx->dataconnclient = NULL;
+    ctx->dataconnserver = NULL;
+    ctx->controlconnclient = clientsock;
     printk("kftp: beginning client loop");
     kernel_send(clientsock,startmsg,strlen(startmsg));
     char buf[256];
+
     while (1)
     {
-        int r = kernel_recv(clientsock,buf,256);
-        if (r <= 0)
+        memset(buf,0,256);
+        int index = 0;
+        while (index < 256)
         {
-            printk(KERN_ERR "Message recv fail!");
-            return -1;
+            int r = kernel_recv(clientsock,buf+index,1);
+            printk("%x\n",buf[index]);
+            if (r <= 0)
+            {
+                printk(KERN_ERR "Message recv fail!\n");
+                return -1;
+            }
+            if (buf[index] == 0xa){
+                break;
+            }
+            index++;
         }
-        processFTP(clientsock,buf);
+
+        if (processFTP(ctx,clientsock,buf) != 0){
+            break;
+        }
     }
+    printk(KERN_INFO "Freeing client socket object.");
+    kfree(ctx);
     return 0;
 }
 static int kftp_start(void)
@@ -62,8 +108,10 @@ static int kftp_start(void)
     struct sockaddr_in serv;
     serv.sin_addr.s_addr = 0;
     serv.sin_family = AF_INET;
-    serv.sin_port = htons(2122);
-
+    serv.sin_port = htons(2121);
+    sockptr_t optval = USER_SOCKPTR(1);
+    sock_setsockopt(ftpsock, SOL_SOCKET, SO_REUSEADDR, optval, sizeof(int));
+    sock_setsockopt(ftpsock, SOL_SOCKET, SO_REUSEPORT, optval, sizeof(int));
 
     int bind = kernel_bind(ftpsock,(struct sockaddr*) &serv,sizeof(serv));
     if (bind < 0)

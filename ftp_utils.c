@@ -1,7 +1,6 @@
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/socket.h>
-
 #include "ftp_utils.h"
 int kernel_recv(struct socket* socket, char* buf, int len)
 {
@@ -36,4 +35,12 @@ int kernel_send(struct socket* socket, char* buf, int len)
 
     int err = kernel_sendmsg(socket, &msg,&iov,len,len);
     return err;
+}
+
+
+unsigned int get_random_open_port(){
+    unsigned long long int r;
+    get_random_bytes(&r,sizeof(unsigned long long int));
+    // TODO: Check if port is actually open
+    return (r % 64511) + 1025;
 }
