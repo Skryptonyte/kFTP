@@ -65,6 +65,7 @@ int recieve_loop(struct socket* clientsock)
     printk(KERN_INFO "Allocating client socket object.");
     struct client_context *ctx = kmalloc(sizeof(struct client_context),GFP_KERNEL);
     ctx->passive = 0;
+    ctx->authorized = 0;
     ctx->dataconnclient = NULL;
     ctx->dataconnserver = NULL;
     ctx->controlconnclient = clientsock;

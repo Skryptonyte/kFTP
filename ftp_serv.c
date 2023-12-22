@@ -19,6 +19,7 @@ void ftpPASS(struct client_context* ctx, struct socket* clientsock)
     char* response = "230 placeholder\r\n";
     printk(KERN_INFO "kftp: Received PASS\n");
     kernel_send(clientsock,response,strlen(response));
+    ctx->authorized = 1;
 }
 
 void ftpSYST(struct client_context* ctx, struct socket* clientsock)
@@ -32,6 +33,9 @@ void ftpSYST(struct client_context* ctx, struct socket* clientsock)
 
 void ftpPASV(struct client_context* ctx, struct socket* clientsock)
 {
+    if (!check_client_auth(ctx)){
+        return;
+    }
     printk(KERN_INFO "kftp: Received PASV\n");
     create_passive_data_connection(ctx, get_random_open_port());
 }
@@ -56,6 +60,13 @@ void ftpRETR(struct client_context* ctx, struct socket* clientsock)
     char* response_open = "150 Opening connection\r\n";
     char* response_file_transfer_success = "226 File download successful\r\n";
     char message[256];
+    if (!check_client_auth(ctx)){
+        return;
+    }
+    if (!check_dtp(ctx))
+    {
+        return;
+    }
     printk(KERN_INFO "kftp: Received RETR\n");
 
     int err = kernel_accept(ctx->dataconnserver,&ctx->dataconnclient,0);
@@ -115,5 +126,23 @@ int create_passive_data_connection(struct client_context* ctx, int data_port){
     
 
     
+    return 0;
+}
+
+int check_client_auth(struct client_context* ctx)
+{
+    if (ctx->authorized == 1)
+        return 1;
+    char* response = "530 Not authorized\r\n";
+    kernel_send(ctx->controlconnclient,response,strlen(response));
+    return 0;
+}
+
+int check_dtp(struct client_context* ctx)
+{
+    if (ctx->dataconnserver)
+        return 1;
+    char* response = "425 Server DTP not open (Use PASV)\r\n";
+    kernel_send(ctx->controlconnclient,response,strlen(response));
     return 0;
 }
