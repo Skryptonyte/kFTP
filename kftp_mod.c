@@ -49,11 +49,14 @@ int processFTP(struct client_context* ctx,struct socket* clientsock,char* buf)
     }
     else if (!strncmp(buf,"RETR",4))
     {
-        ftpRETR(ctx, clientsock);
+        const char* path = strrchr(buf,' ')+1;
+        if (strrchr(buf,'\r'))
+            *strrchr(buf,'\r') = 0;
+        ftpRETR(ctx, clientsock, path);
     }
     else
     {
-        printk(KERN_INFO "kftp: Unrecognized Command");
+        printk(KERN_INFO "kftp: Unrecognized Command\n");
         char* response = "500 UNRECOGNIZED COMMAND\r\n";
         kernel_send(clientsock,response,strlen(response));
     }
@@ -62,14 +65,14 @@ int processFTP(struct client_context* ctx,struct socket* clientsock,char* buf)
 
 int recieve_loop(struct socket* clientsock)
 {
-    printk(KERN_INFO "Allocating client socket object.");
+    printk(KERN_INFO "Allocating client socket object.\n");
     struct client_context *ctx = kmalloc(sizeof(struct client_context),GFP_KERNEL);
     ctx->passive = 0;
     ctx->authorized = 0;
     ctx->dataconnclient = NULL;
     ctx->dataconnserver = NULL;
     ctx->controlconnclient = clientsock;
-    printk("kftp: beginning client loop");
+    printk("kftp: beginning client loop\n");
     kernel_send(clientsock,startmsg,strlen(startmsg));
     char buf[256];
 
@@ -96,39 +99,39 @@ int recieve_loop(struct socket* clientsock)
             break;
         }
     }
-    printk(KERN_INFO "Freeing client socket object.");
+    printk(KERN_INFO "Freeing client socket object.\n");
     kfree(ctx);
     return 0;
 }
 static int kftp_start(void)
 {
-    printk(KERN_INFO "kftp: starting kftp server at 2121");
+    printk(KERN_INFO "kftp: starting kftp server at 2121\n");
     sock_create(PF_INET, SOCK_STREAM,IPPROTO_TCP,&ftpsock);
 
 
     struct sockaddr_in serv;
     serv.sin_addr.s_addr = 0;
     serv.sin_family = AF_INET;
-    serv.sin_port = htons(2121);
-    sockptr_t optval = USER_SOCKPTR(1);
-    sock_setsockopt(ftpsock, SOL_SOCKET, SO_REUSEADDR, optval, sizeof(int));
-    sock_setsockopt(ftpsock, SOL_SOCKET, SO_REUSEPORT, optval, sizeof(int));
+    serv.sin_port = htons(2122);
+    int* optval = 1;
+    sock_set_reuseaddr(ftpsock->sk);
+    sock_set_reuseport(ftpsock->sk);
 
     int bind = kernel_bind(ftpsock,(struct sockaddr*) &serv,sizeof(serv));
     if (bind < 0)
     {
-        printk(KERN_ERR "kftp: failed to bind at port 2121");
+        printk(KERN_ERR "kftp: failed to bind at port 2121\n");
         return -1;
     }
     kernel_listen(ftpsock, 10);
-    static struct socket *clientsock;
+    struct socket *clientsock;
 
 
-    printk(KERN_INFO "Acceping connections!");
+    printk(KERN_INFO "Acceping connections!\n");
 
     int err = kernel_accept(ftpsock,&clientsock,0);
     if (err < 0)
-        printk(KERN_ERR "kftp: failed to register new client!");
+        printk(KERN_ERR "kftp: failed to register new client!\n");
     else
     {
         printk(KERN_INFO "kftp: new client accepted: %p!",clientsock);
@@ -140,7 +143,7 @@ static int kftp_start(void)
 static void kftp_stop(void)
 {
 
-    printk(KERN_INFO "kftp: stopping kftp server");
+    printk(KERN_INFO "kftp: stopping kftp server\n");
     sock_release(ftpsock);
 }
 
