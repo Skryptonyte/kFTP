@@ -55,42 +55,60 @@ void ftpTYPE(struct client_context* ctx, struct socket* clientsock)
 }
 
 
-void ftpRETR(struct client_context* ctx, struct socket* clientsock)
+void ftpRETR(struct client_context* ctx, struct socket* clientsock, const char* path)
 {
     char* response_open = "150 Opening connection\r\n";
+    char* response_file_open_fail = "550 Failed to open file\r\n";
     char* response_file_transfer_success = "226 File download successful\r\n";
     char message[256];
+    struct file* file = kernel_retr_file(path);
+
     if (!check_client_auth(ctx)){
+        clean_up_dtp(ctx);
         return;
     }
     if (!check_dtp(ctx))
     {
+        clean_up_dtp(ctx);
         return;
     }
     printk(KERN_INFO "kftp: Received RETR\n");
+    printk(KERN_INFO "Transferring file: %s\n", path);
+
 
     int err = kernel_accept(ctx->dataconnserver,&ctx->dataconnclient,0);
     if (err < 0)
     {
         printk(KERN_ERR "kftp: failed to register new client!\n");
+        clean_up_dtp(ctx);
         return;
     }
     else
     {
-        printk(KERN_INFO "kftp: new client accepted: %p!",clientsock);
+        printk(KERN_INFO "kftp: new client accepted: %p!\n",clientsock);
     }
+    if (!file)
+    {
+        printk(KERN_INFO "kftp: WARN: failed to open file: %s!\n",path);
+        kernel_send(ctx->controlconnclient,response_file_open_fail,strlen(response_file_open_fail));
+        // clean_up_dtp(ctx);
+        return;
+    }
+    kernel_send(ctx->controlconnclient,response_open,strlen(response_open));
 
-    kernel_send(clientsock,response_open,strlen(response_open));
-
-    strcpy(message, "Test Message - from kFTP, the world's first kernel-level FTP server\n");
-    kernel_send(ctx->dataconnclient, message,strlen(message));
+    loff_t pos = 0;
+    while (1) {
+        memset(message,0,256);
+        int ret = kernel_retr_read_file(file, message, 256, &pos);
+        printk(KERN_INFO "Fetching %d bytes at offset %d\n",ret,pos);
+        if (ret <= 0)
+            break;
+        kernel_send(ctx->dataconnclient, message,256);
+    }
     
-    kernel_send(clientsock,response_file_transfer_success,strlen(response_file_transfer_success));
+    kernel_send(ctx->controlconnclient,response_file_transfer_success,strlen(response_file_transfer_success));
 
-    sock_release(ctx->dataconnclient);
-    sock_release(ctx->dataconnserver);
-    ctx->dataconnclient = NULL;
-    ctx->dataconnserver = NULL;
+    clean_up_dtp(ctx);
 }
 
 int create_passive_data_connection(struct client_context* ctx, int data_port){
@@ -124,8 +142,6 @@ int create_passive_data_connection(struct client_context* ctx, int data_port){
     printk(KERN_INFO "kftp: PASV response - %s\n",response);
     kernel_send(ctx->controlconnclient,response,strlen(response));
     
-
-    
     return 0;
 }
 
@@ -145,4 +161,16 @@ int check_dtp(struct client_context* ctx)
     char* response = "425 Server DTP not open (Use PASV)\r\n";
     kernel_send(ctx->controlconnclient,response,strlen(response));
     return 0;
+}
+
+void clean_up_dtp(struct client_context* ctx)
+{
+    if (ctx->dataconnclient){
+        sock_release(ctx->dataconnclient);
+        ctx->dataconnclient = NULL;
+    }
+    if (ctx->dataconnserver){
+        sock_release(ctx->dataconnserver);
+        ctx->dataconnserver = NULL;
+    }
 }
