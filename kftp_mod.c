@@ -100,6 +100,7 @@ int recieve_loop(struct socket* clientsock)
         }
     }
     printk(KERN_INFO "Freeing client socket object.\n");
+    sock_release(ctx->controlconnclient);
     kfree(ctx);
     return 0;
 }
@@ -129,13 +130,19 @@ static int kftp_start(void)
 
     printk(KERN_INFO "Acceping connections!\n");
 
-    int err = kernel_accept(ftpsock,&clientsock,0);
-    if (err < 0)
-        printk(KERN_ERR "kftp: failed to register new client!\n");
-    else
+    while (1)
     {
-        printk(KERN_INFO "kftp: new client accepted: %p!",clientsock);
-        recieve_loop(clientsock);
+        int err = kernel_accept(ftpsock,&clientsock,0);
+        if (err < 0)
+        {
+            printk(KERN_ERR "kftp: failed to register new client!\n");
+            break;
+        }
+        else
+        {
+            printk(KERN_INFO "kftp: new client accepted: %p!",clientsock);
+            recieve_loop(clientsock);
+        }
     }
     return 0;
 }

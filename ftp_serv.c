@@ -138,7 +138,7 @@ int create_passive_data_connection(struct client_context* ctx, int data_port){
     
     kernel_listen(ctx->dataconnserver, 5);
 
-    sprintf(response,"227 Entering Passive Mode (127,0,0,1,%d,%d)\r\n",(data_port>>8)&0xff,data_port&0xff);
+    sprintf(response,"227 Entering Passive Mode (0,0,0,0,%d,%d)\r\n",(data_port>>8)&0xff,data_port&0xff);
     printk(KERN_INFO "kftp: PASV response - %s\n",response);
     kernel_send(ctx->controlconnclient,response,strlen(response));
     
