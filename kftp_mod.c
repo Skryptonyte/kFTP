@@ -113,7 +113,7 @@ static int kftp_start(void)
     struct sockaddr_in serv;
     serv.sin_addr.s_addr = 0;
     serv.sin_family = AF_INET;
-    serv.sin_port = htons(2122);
+    serv.sin_port = htons(2121);
     int* optval = 1;
     sock_set_reuseaddr(ftpsock->sk);
     sock_set_reuseport(ftpsock->sk);
