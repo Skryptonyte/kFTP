@@ -1,6 +1,6 @@
-# kFTP
+# kernFTP
 
-A very WIP project that aims to run a function FTP server in the kernel.
+A project that aims to run a full fledged FTP entirely in kernel space.
 
 ## Features
 
