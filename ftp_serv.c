@@ -6,7 +6,7 @@
 
 #include "ftp_utils.h"
 #include "ftp_serv.h"
-
+#include "ftp_list.h"
 void ftpUSER(struct client_context* ctx, struct socket* clientsock)
 {
     char* response = "331 placeholder\r\n";
@@ -28,7 +28,6 @@ void ftpSYST(struct client_context* ctx, struct socket* clientsock)
     printk(KERN_INFO "kftp: Received SYST\n");
     kernel_send(clientsock,response,strlen(response));
 }
-
 
 
 void ftpPASV(struct client_context* ctx, struct socket* clientsock)
@@ -91,7 +90,7 @@ void ftpRETR(struct client_context* ctx, struct socket* clientsock, const char* 
     {
         printk(KERN_INFO "kftp: WARN: failed to open file: %s!\n",path);
         kernel_send(ctx->controlconnclient,response_file_open_fail,strlen(response_file_open_fail));
-        // clean_up_dtp(ctx);
+        clean_up_dtp(ctx);
         return;
     }
     kernel_send(ctx->controlconnclient,response_open,strlen(response_open));
@@ -105,6 +104,48 @@ void ftpRETR(struct client_context* ctx, struct socket* clientsock, const char* 
             break;
         kernel_send(ctx->dataconnclient, message,256);
     }
+    
+    kernel_send(ctx->controlconnclient,response_file_transfer_success,strlen(response_file_transfer_success));
+
+    clean_up_dtp(ctx);
+}
+
+void ftpLIST(struct client_context* ctx, struct socket* clientsock, const char* path)
+{
+    char* response_open = "150 Opening connection\r\n";
+    char* response_file_open_fail = "550 Failed to open file\r\n";
+    char* response_file_transfer_success = "226 directory list complete\r\n";
+    char message[256];
+
+    if (!check_client_auth(ctx)){
+        clean_up_dtp(ctx);
+        return;
+    }
+    if (!check_dtp(ctx))
+    {
+        clean_up_dtp(ctx);
+        return;
+    }
+    printk(KERN_INFO "kftp: Received LIST\n");
+
+    int err = kernel_accept(ctx->dataconnserver,&ctx->dataconnclient,0);
+    if (err < 0)
+    {
+        printk(KERN_ERR "kftp: failed to register new client!\n");
+        clean_up_dtp(ctx);
+        return;
+    }
+    else
+    {
+        printk(KERN_INFO "kftp: new client accepted: %p!\n",clientsock);
+    }
+
+    kernel_send(ctx->controlconnclient,response_open,strlen(response_open));
+
+    memset(message, 0, 256);
+    int readdir_res = ftp_readdir(path, ctx->dataconnclient);
+
+    kernel_send(ctx->dataconnclient, message,256);
     
     kernel_send(ctx->controlconnclient,response_file_transfer_success,strlen(response_file_transfer_success));
 
@@ -144,6 +185,7 @@ int create_passive_data_connection(struct client_context* ctx, int data_port){
     
     return 0;
 }
+
 
 int check_client_auth(struct client_context* ctx)
 {

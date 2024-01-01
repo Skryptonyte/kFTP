@@ -54,6 +54,20 @@ int processFTP(struct client_context* ctx,struct socket* clientsock,char* buf)
             *strrchr(buf,'\r') = 0;
         ftpRETR(ctx, clientsock, path);
     }
+    else if (!strncmp(buf,"LIST",4))
+    {
+        const char* pos = strrchr(buf,' ');
+        const char* path;
+
+        if (strrchr(buf,'\r'))
+            *strrchr(buf,'\r') = 0;
+
+        if (!pos)
+            path = "/";
+        else
+            path = pos+1;
+        ftpLIST(ctx, clientsock, path);
+    }
     else
     {
         printk(KERN_INFO "kftp: Unrecognized Command\n");
