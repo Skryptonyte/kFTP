@@ -4,16 +4,16 @@ A project that aims to run a full fledged FTP entirely in kernel space.
 
 ## Features
 
-* USER, PASS, TYPE, PASV, RETR, LIST, QUIT commands recognized
-* Passive data transfer of any file in the designated FTP directory using PASV and RETR supported!
+* USER, PASS, TYPE, PASV, EPSV, RETR, LIST, QUIT commands recognized
+* Passive downloads supported in both extended (EPSV) and regular passive mode (PASV).
 * Mount namespacing to fully isolate FTP directories from path traversal escapes and unpermitted accesses using the helper userspace binary run_server.
 
 ## TODO
 
-* More essential commands like CWD, PWD, PORT, EPSV etc.
+* More essential commands like CWD, PWD, PORT etc.
 * Multithreaded or event based client loop support, whichever comes first.
 * Proper clean up of resources.
-* Fixes for millions of potential UAFs and race conditions.
+* Fixes for millions of potential BoFs, UAFs and race conditions.
 
 ## Compile and run
 

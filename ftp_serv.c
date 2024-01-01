@@ -36,7 +36,16 @@ void ftpPASV(struct client_context* ctx, struct socket* clientsock)
         return;
     }
     printk(KERN_INFO "kftp: Received PASV\n");
-    create_passive_data_connection(ctx, get_random_open_port());
+    create_passive_data_connection(ctx, get_random_open_port(), false);
+}
+
+void ftpEPSV(struct client_context* ctx, struct socket* clientsock)
+{
+    if (!check_client_auth(ctx)){
+        return;
+    }
+    printk(KERN_INFO "kftp: Received EPSV\n");
+    create_passive_data_connection(ctx, get_random_open_port(), true);
 }
 
 void ftpQUIT(struct client_context* ctx, struct socket* clientsock)
@@ -152,7 +161,7 @@ void ftpLIST(struct client_context* ctx, struct socket* clientsock, const char* 
     clean_up_dtp(ctx);
 }
 
-int create_passive_data_connection(struct client_context* ctx, int data_port){
+int create_passive_data_connection(struct client_context* ctx, int data_port, bool extended){
     struct sockaddr_in serv;
     char response[256];
 
@@ -179,7 +188,13 @@ int create_passive_data_connection(struct client_context* ctx, int data_port){
     
     kernel_listen(ctx->dataconnserver, 5);
 
-    sprintf(response,"227 Entering Passive Mode (127,0,0,1,%d,%d)\r\n",(data_port>>8)&0xff,data_port&0xff);
+    if (extended)
+    {
+        sprintf(response,"229 Entering Extended Passive Mode (|||%d|)\r\n",data_port);
+    }
+    else{
+        sprintf(response,"227 Entering Passive Mode (127,0,0,1,%d,%d)\r\n",(data_port>>8)&0xff,data_port&0xff);
+    }
     printk(KERN_INFO "kftp: PASV response - %s\n",response);
     kernel_send(ctx->controlconnclient,response,strlen(response));
     

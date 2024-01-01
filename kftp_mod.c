@@ -39,6 +39,10 @@ int processFTP(struct client_context* ctx,struct socket* clientsock,char* buf)
     {
         ftpPASV(ctx, clientsock);
     }
+    else if (!strncmp(buf,"EPSV",4))
+    {
+        ftpEPSV(ctx, clientsock);
+    }
     else if (!strncmp(buf,"QUIT",4))
     {
         ftpQUIT(ctx, clientsock);
